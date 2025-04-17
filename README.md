@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Car Rental Project
 
 This project is a modern web application for car rental services, built using [Vite](https://vitejs.dev/), [React](https://react.dev/), and [Redux](https://redux.js.org/). It provides a user-friendly interface for customers to browse, book, and manage car rentals.
@@ -50,3 +51,6 @@ To run tests, use:
 npm run test
 ```
 
+=======
+# car-rent-front
+>>>>>>> b8161e7eace21b6b633eb7a371d3c2a5a0c34506
