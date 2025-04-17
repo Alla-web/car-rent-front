@@ -1,73 +1,100 @@
-import Button from "components/Button/Button"
-import Input from "components/Input/Input"
-import * as Yup from "yup"
-import { useFormik } from "formik"
-import { useEffect, useState } from "react"
-import { EditUserFormProps } from "./types"
-import { useLocation, useNavigate } from "react-router-dom"
-import { CustomerProps } from "components/CustomerComponent/types"
-import { useAppDispatch } from "store/hooks"
-import { userActions } from "store/redux/UserSlice/UserSlise"
-import { authSelectors } from "store/redux/AuthSlice/authSlice"
-import { useSelector } from "react-redux"
+import Button from "components/Button/Button";
+import Input from "components/Input/Input";
+import * as Yup from "yup";
+import { useFormik } from "formik";
+import { useEffect, useState } from "react";
+import { EditUserFormProps } from "./types";
+import { useLocation, useNavigate } from "react-router-dom";
+import { CustomerProps } from "components/CustomerComponent/types";
+import { useAppDispatch, useAppSelector } from "store/hooks";
+import { userActions } from "store/redux/UserSlice/UserSlise";
+import { authActions, authSelectors } from "store/redux/AuthSlice/authSlice";
+import { useSelector } from "react-redux";
+import { AsyncThunkAction } from "@reduxjs/toolkit";
+import Notification1 from "components/Notification/Notification1";
+import Loader from "components/Loader/Loader";
 
 const EditUserForm: React.FC<EditUserFormProps> = ({ customer }) => {
-  const navigate = useNavigate()
-  const location = useLocation()
-  const { customerData } = location.state || {}
-  const dispatch = useAppDispatch()
-  const user = useSelector(authSelectors.userData)
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { customerData } = location.state || {};
+  const dispatch = useAppDispatch();
+  const user = useSelector(authSelectors.userData);
+  const accessToken = useAppSelector(authSelectors.accessToken);
+
+  const [showNotification, setShowNotification] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState("");
+  const [notificationTopic, setNotificationTopic] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [formData, setFormData] = useState<CustomerProps>(customerData);
 
   const validationSchema = Yup.object({
-    firstName: Yup.string().required("First name"),
-    lastName: Yup.string().required("Last name is required"),
-    email: Yup.string().required("Email is required"),
-    // password: Yup.string().required("Password is required"),
-  })
-
-  const [formData, setFormData] = useState<CustomerProps>(customerData)
+    firstName: Yup.string().required("First name")
+    .min(2, "Must have at least 2 characters")
+    .max(15, "Name must be less than 15 characters")
+    .matches(/^[a-zA-Z0-9 ]+$/, "Name must not contain special characters"),
+    lastName: Yup.string().required("Last name is required")
+    .min(2, "Must have at least 2 characters")
+    .max(15, "Name must be less than 15 characters")
+    .matches(/^[a-zA-Z0-9 ]+$/, "Name must not contain special characters"),
+    email: Yup.string().required("Email is required")
+    .email("Invalid email format"),
+        // password: Yup.string().required("Password is required"),
+  });
 
   useEffect(() => {
     if (customerData) {
-      setFormData(customerData)
+      setFormData(customerData);
     }
-  }, [customer])
+  }, [customerData]);
 
   const formik = useFormik({
     initialValues: formData,
     validationSchema: validationSchema,
-    validateOnChange: false,
+    validateOnChange: true,
     validateOnBlur: true,
-    onSubmit: (values: CustomerProps) => {
-      console.log("Submitted values:", values)
-      console.log("Errors:", formik.errors)
-      alert("The user is edited")
-      dispatch(
-        userActions.updateUser({
-          id: customer.id,
-          updatedData: values,
-        }),
-      )
-      if (user?.role === "ROLE_ADMIN") {
-        navigate("/admin/allUsers")
-      } else if (user?.role === "ROLE_CUSTOMER") {
-        navigate("/account/myData")
-      } else {
-        console.error("Unknown role")
+    onSubmit: async (values: CustomerProps) => {
+      try {
+        setIsLoading(true);
+        await dispatch(
+          userActions.updateUser({
+            customerId: customerData.id,
+            updatedData: values,
+            token: accessToken,
+          }),
+        ).unwrap();
+        setNotificationTopic("Success");
+        setNotificationMessage("The user is edited");
+        setShowNotification(true);
+        setTimeout(() => {
+          if (user?.role === "ROLE_ADMIN") {
+            navigate("/admin/allUsers");
+          } else if (user?.role === "ROLE_CUSTOMER") {
+            navigate("/account/myData");
+          } else {
+            console.error("Unknown role");
+          }
+        }, 2000);
+      } catch (error) {
+        setNotificationTopic("Error");
+        setNotificationMessage("Failed to edit user");
+        setShowNotification(true);
+      } finally {
+        setIsLoading(false);
       }
     },
-  })
+  });
 
   //Handle close button click
   const handleClose = () => {
     if (user?.role === "ROLE_ADMIN") {
-      navigate("/admin/allUsers")
+      navigate("/admin/allUsers");
     } else if (user?.role === "ROLE_CUSTOMER") {
-      navigate("/account/myData")
+      navigate("/account/myData");
     } else {
-      console.error("Unknown role")
+      console.error("Unknown role");
     }
-  }
+  };
 
   return (
     <div className="flex flex-col w-[590px] mx-auto gap-8 rounded-md m-3">
@@ -131,7 +158,34 @@ const EditUserForm: React.FC<EditUserFormProps> = ({ customer }) => {
           />
         </div>
       </form>
+      {isLoading && <Loader />}
+      {showNotification && (
+        <Notification1
+          topic={notificationTopic}
+          message={notificationMessage}
+          onClose={() => setShowNotification(false)}
+        />
+      )}
     </div>
-  )
+  );
+};
+
+export default EditUserForm;
+function dispatch(
+  arg0: AsyncThunkAction<
+    any,
+    void,
+    {
+      state?: undefined;
+      dispatch?: undefined;
+      extra?: unknown;
+      rejectValue?: unknown;
+      serializedErrorType?: unknown;
+      pendingMeta?: unknown;
+      fulfilledMeta?: unknown;
+      rejectedMeta?: unknown;
+    }
+  >,
+) {
+  throw new Error("Function not implemented.");
 }
-export default EditUserForm

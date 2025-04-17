@@ -1,6 +1,4 @@
-import { UserSliceState } from "./types"
-import { CustomerProps } from "components/CustomerComponent/types"
-import { CustomerDataProps } from "components/CustomerComponent/CustomerComponent"
+import { UserData, UserSliceState } from "./types"
 import { createAppSlice } from "store/createAppSlice"
 import axios from "axios"
 
@@ -24,22 +22,26 @@ export const userSlice = createAppSlice({
   initialState: userInitialState,
   reducers: create => ({
     getAllUsers: create.asyncThunk(
-      async (__, thunkApi) => {
+      async (token: string | null, thunkApi) => {
         try {
-          const result = await axios.get(`/api/customers`)
+          const result = await axios.get<UserData[]>(`/api/customers`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          })
           return result.data
-        } catch (error) {
-          return thunkApi.rejectWithValue(error)
+        } catch (error: any) {
+          return thunkApi.rejectWithValue(error.response?.data || error.message)
         }
       },
       {
         pending: (state: UserSliceState) => {
-          state.userList = []
+          // state.userList = []
           state.status = "loading"
           state.error = undefined
         },
         fulfilled: (state: UserSliceState, action: any) => {
-          state.userList = action.payload.userList
+          state.userList = action.payload
           state.status = "success"
         },
         rejected: (state: UserSliceState, action: any) => {
@@ -48,64 +50,57 @@ export const userSlice = createAppSlice({
         },
       },
     ),
-    getUser: create.asyncThunk(
-      async (id, thunkApi) => {
+    getUserById: create.asyncThunk(
+      async (id: string, thunkApi) => {
         try {
-          const result = await axios.get(`/api/customers/${id}`)
-          return result.data
-        } catch (error) {
-          return thunkApi.rejectWithValue(error)
+          const result = await axios.get(`/api/customers/${id}`);
+          return result.data;
+        } catch (error: any) {
+          return thunkApi.rejectWithValue(error.response?.data || error.message);
         }
       },
       {
         pending: (state: UserSliceState) => {
-          (state.userData = {
-            id: "",
-            firstName: "",
-            lastName: "",
-            email: "",
-            password: "",
-            role: "",
-            isActive: true,
-          }),
-            (state.error = undefined)
-          state.status = "default"
+          state.status = "loading";
+          state.error = undefined;
         },
-        fulfilled: (state: UserSliceState, action: any) => {
-          state.userData = {
-            id: action.payload.id,
-            firstName: action.payload.firstName,
-            lastName: action.payload.lastName,
-            email: action.payload.email,
-            password: action.payload.password,
-            role: action.payload.role,
-            isActive: action.payload.isActive,
-          }
-          state.status = "success"
+        fulfilled: (state: UserSliceState, action:any ) => {
+          state.userData = action.payload;
+          state.status = "success";
         },
         rejected: (state: UserSliceState, action: any) => {
-          state.error = action.payload
-          state.status = "error"
+          state.error = action.payload;
+          state.status = "error";
         },
       },
     ),
     updateUser: create.asyncThunk(
       async (
-        //attention password is not updated and excluded from updated data
-        { id, updatedData }: { id: string; updatedData: CustomerProps },
-        thunkApi
+        {
+          customerId,
+          updatedData,
+          token,
+        }: {
+          customerId: string
+          updatedData: { firstName?: string; lastName?: string; email?: string }
+          token: string | null
+        },
+        thunkApi,
       ) => {
         try {
-          const { firstName, lastName, email } = updatedData
-          const dataToUpdate = { firstName, lastName, email }
-
           const result = await axios.put(
-            `/api/customers/update/${id}`,
-            dataToUpdate,
+            `/api/customers/update/${customerId}`,
+            updatedData,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": `application/json`,
+              },
+            },
           )
           return result.data
-        } catch (error) {
-          return thunkApi.rejectWithValue(error)
+        } catch (error: any) {
+          return thunkApi.rejectWithValue(error.response?.data || error.message)
         }
       },
       {
@@ -114,22 +109,35 @@ export const userSlice = createAppSlice({
           state.error = undefined
         },
         fulfilled: (state: UserSliceState, action: any) => {
-          state.userData = action.payload.dataToUpdate
+          state.userData = action.payload
+
+          state.userList = state.userList.map(userData =>
+            userData.id === action.payload.id ? action.payload : userData,
+          )
+
           state.status = "success"
         },
         rejected: (state: UserSliceState, action: any) => {
-          state.error = action.payload
+          state.error = action.payload || "Something went wrong..."
           state.status = "error"
         },
       },
     ),
     deleteUser: create.asyncThunk(
-      async (id, thunkApi) => {
+      async (
+        { customerId, token }: { customerId: string; token: string | null },
+        thunkApi,
+      ) => {
         try {
-          const result = await axios.delete(`/api/customers/delete/${id}`)
-          return result.data
-        } catch (error) {
-          return thunkApi.rejectWithValue(error)
+          await axios.delete(`/api/customers/delete/${customerId}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": `application/json`,
+            },
+          })
+          return customerId
+        } catch (error: any) {
+          return thunkApi.rejectWithValue(error.response?.data || error.message)
         }
       },
       {
@@ -138,10 +146,12 @@ export const userSlice = createAppSlice({
           state.error = undefined
         },
         fulfilled: (state: UserSliceState, action: any) => {
-          state.userData = {
-            ...state.userData, // Оставляем старые данные
-            isActive: false, // Обновляем только статус isActive
-          }
+          state.userData = action.payload
+
+          state.userList = state.userList.map(userData =>
+            userData.id === action.payload.id ? action.payload : userData,
+          )
+
           state.status = "success"
         },
         rejected: (state: UserSliceState, action: any) => {
@@ -151,12 +161,24 @@ export const userSlice = createAppSlice({
       },
     ),
     restoreUser: create.asyncThunk(
-      async (id, thunkApi) => {
+      async (
+        { customerId, token }: { customerId: string; token: string | null },
+        thunkApi,
+      ) => {
         try {
-          const result = await axios.put(`/api/customers/restore/${id}`)
-          return result.data
-        } catch (error) {
-          return thunkApi.rejectWithValue(error)
+          await axios.put(
+            `/api/customers/restore/${customerId}`,
+            {},
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": `application/json`,
+              },
+            },
+          )
+          return customerId
+        } catch (error: any) {
+          return thunkApi.rejectWithValue(error.response?.data || error.message)
         }
       },
       {
@@ -165,10 +187,12 @@ export const userSlice = createAppSlice({
           state.error = undefined
         },
         fulfilled: (state: UserSliceState, action: any) => {
-          state.userData = {
-            ...state.userData, // Оставляем старые данные
-            isActive: true, // Обновляем только статус isActive
-          }
+          state.userData = action.payload
+
+          state.userList = state.userList.map(userData =>
+            userData.id === action.payload.id ? action.payload : userData,
+          )
+
           state.status = "success"
         },
         rejected: (state: UserSliceState, action: any) => {
@@ -184,6 +208,7 @@ export const userSlice = createAppSlice({
     selectUserData: (state: UserSliceState) => state.userData,
     selectStatus: (state: UserSliceState) => state.status,
     selectError: (state: UserSliceState) => state.error,
+    selectUserById:(state:UserSliceState)=>state.userData
   },
 })
 

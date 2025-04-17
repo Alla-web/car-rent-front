@@ -1,19 +1,36 @@
-import { BookingProps } from "./types"
+import { BookingProps,CarDto, CustomerDto } from "./types"
+
+// function capitalizeFirstLetter(string: string ) {
+//   return string.charAt(0).toUpperCase() + string.slice(1).toLowerCase();
+// }
+
+const formatStatus = (status: string | undefined): string => {
+  if (!status) return ""
+  
+  const formatted = status
+    .replace(/_/g, " ") 
+    .toLowerCase()      
+    .trim()
+
+  return formatted.charAt(0).toUpperCase() + formatted.slice(1) 
+}
+
+const formatBookingDate = (date: string): string => {
+  return date.replace('T', ' ').substring(0, 16);  
+};
 
 function BookingComponent({
   rentalStartDate,
   rentalEndDate,
-  brand,
-  model,
   carId,
   customerId,
   totalPrice,
   bookingStatus,
-  firstName,
-  lastName,
   updateBookingDate,
   createBookingDate,
   id,
+  carDto,
+  customerDto
 }: BookingProps) {
   return (
     <div className="m-4 rounded-lg transition-transform duration-300 hover:-translate-y-1">
@@ -25,38 +42,38 @@ function BookingComponent({
           <div className="flex gap-4">
             <div className="w-1/4 font-bold">Car:</div>
             <div className="w-3/4">
-              {brand} {model}
+              {carDto?.brand} {carDto?.model}
             </div>
           </div>
           <div className="flex gap-4">
             <div className="w-1/4 font-bold">Renter:</div>
             <div className="w-3/4">
-              {firstName} {lastName}
+              {customerDto?.firstName} {customerDto?.lastName}
             </div>
           </div>
           <div className="flex gap-4">
             <div className="w-1/4 font-bold">Price:</div>
-            <div className="w-3/4">{totalPrice} €</div>
+            <div className="w-3/4">{new Intl.NumberFormat('en-US').format(totalPrice || 0)} €</div>
           </div>
           <div className="flex gap-4">
             <div className="w-1/4 font-bold">Status:</div>
-            <div className="w-3/4">{bookingStatus}</div>
+            <div className="w-3/4">{formatStatus(bookingStatus)}</div>
           </div>
           <div className="flex gap-4">
             <div className="w-1/4 font-bold">Start Date:</div>
-            <div className="w-3/4">{rentalStartDate}</div>
+            <div className="w-3/4">{formatBookingDate(rentalStartDate)}</div>
           </div>
           <div className="flex gap-4">
             <div className="w-1/4 font-bold">End Date:</div>
-            <div className="w-3/4">{rentalEndDate}</div>
+            <div className="w-3/4">{formatBookingDate(rentalEndDate)}</div>
           </div>
           <div className="flex gap-4">
             <div className="w-1/4 font-bold">Rent details updated on:</div>
-            <div className="w-3/4">{updateBookingDate}</div>
+            <div className="w-3/4">{formatBookingDate(updateBookingDate)}</div>
           </div>
           <div className="flex gap-4">
             <div className="w-1/4 font-bold">Rent created on:</div>
-            <div className="w-3/4">{createBookingDate}</div>
+            <div className="w-3/4">{formatBookingDate(createBookingDate)}</div>
           </div>
         </div>
       </div>

@@ -3,6 +3,7 @@ import axios from "axios"
 import { createAppSlice } from "store/createAppSlice"
 import { AuthSliceState } from "./type"
 
+
 const initialAuthState: AuthSliceState = {
   user: null,
   loginError: undefined,
@@ -12,13 +13,15 @@ const initialAuthState: AuthSliceState = {
   registerMessage: undefined,
   accessToken: localStorage.getItem("accessToken"),
   refreshToken: undefined,
-  isLoggedIn: false,
+  isLoggedIn: Boolean(localStorage.getItem("isLoggedIn")),
+  isEmailConfirmed: false,
 }
 
 const LOGIN_URL = "/api/auth/login"
 //const LOGOUT_URL = "/api/auth/logout"
 const REGISTER_URL = "/api/auth/register"
 const PROFILE_URL = "/api/customers/find-me"
+const CONFIRM_EMAIL = "/api/auth/confirm"
 
 export const authSlice = createAppSlice({
   name: "AUTH",
@@ -33,8 +36,14 @@ export const authSlice = createAppSlice({
           const response = await axios.post(LOGIN_URL, { email, password })
           const { accessToken, refreshToken } = response.data
           localStorage.setItem("accessToken", accessToken)
-          return { accessToken, refreshToken, user: response.data.user }
 
+          //
+
+          const userResponse = await thunkApi.dispatch(
+            authActions.getCurrentUser()
+          ) as { payload: AuthSliceState['user'] }
+
+          return { accessToken, refreshToken, user: userResponse.payload } //
         } catch (error: any) {
           return thunkApi.rejectWithValue(
             error.response?.data?.message || "Login failed",
@@ -52,17 +61,20 @@ export const authSlice = createAppSlice({
           state.accessToken = action.payload.accessToken
           state.refreshToken = action.payload.refreshToken
           state.user = action.payload.user
-          state.loginError = undefined
+          state.loginError = undefined 
           state.successMessage = "Login successful!"
           state.isLoggedIn = true
+          localStorage.setItem("isLoggedIn", "true")
         },
         rejected: (state: AuthSliceState, action: any) => {
           state.status = "error"
           state.loginError = action.payload || "Something went wrong"
           state.successMessage = undefined
+          localStorage.removeItem("isLoggedIn")
         },
       },
     ),
+
     getCurrentUser: create.asyncThunk(
       async (_, thunkApi) => {
         try {
@@ -88,7 +100,7 @@ export const authSlice = createAppSlice({
           state.status = "success"
           state.user = action.payload
           state.loginError = undefined
-          state.isLoggedIn = true  
+          state.isLoggedIn = true
         },
         rejected: (state: AuthSliceState, action: any) => {
           state.status = "error"
@@ -107,31 +119,43 @@ export const authSlice = createAppSlice({
       state.status = "default"
       state.successMessage = undefined
       state.registerMessage = undefined
-      state.isLoggedIn = false 
+      state.isLoggedIn = false
 
       localStorage.removeItem("accessToken")
       localStorage.removeItem("refreshToken")
+      localStorage.removeItem("isLoggedIn")
     }),
     //  registerNewCustomer
     registerNewCustomer: create.asyncThunk(
       async (
-        { firstName, lastName, email, password,
-        }: { firstName: string, lastName: string,  email: string,  password: string
+        {
+          firstName,
+          lastName,
+          email,
+          password,
+        }: {
+          firstName: string
+          lastName: string
+          email: string
+          password: string
         },
         thunkApi,
       ) => {
         try {
-         /*  const response = */
-           await axios.post(REGISTER_URL, {firstName, lastName, email, password,
-          });
-          return {};
-         /*  const loginResponse = await thunkApi.dispatch(
+          /*  const response = */
+          await axios.post(REGISTER_URL, {
+            firstName,
+            lastName,
+            email,
+            password,
+          })
+          return {}
+          /*  const loginResponse = await thunkApi.dispatch(
             authActions.loginUser({ email, password })
           ) as { payload: { accessToken: string; refreshToken: string; user: any } };
 
           return response.data 
           return loginResponse.payload; */
-
         } catch (error: any) {
           return thunkApi.rejectWithValue(
             error.response?.data?.message || "Registration failed",
@@ -146,7 +170,8 @@ export const authSlice = createAppSlice({
         fulfilled: (state, action) => {
           state.status = "success"
           state.registerError = undefined
-          state.registerMessage = "Registration successful! Please check your email to confirm your registration.";
+          state.registerMessage =
+            "Registration successful! Please check your email to confirm your registration."
         },
         rejected: (state, action) => {
           state.status = "error"
@@ -159,6 +184,49 @@ export const authSlice = createAppSlice({
         },
       },
     ),
+
+    confirmEmail: create.asyncThunk(
+      async (token: string, thunkApi) => {
+        try {
+          const response = await axios.get(`${CONFIRM_EMAIL}/${token}`)
+          return response.data
+        } catch (error: any) {
+          return thunkApi.rejectWithValue(
+            error.response?.data?.message || "Email confirmation failed",
+          )
+        }
+      },
+      {
+        pending: state => {
+          state.status = "loading"
+          state.registerError = undefined
+          state.successMessage = undefined
+        },
+
+        fulfilled: (state, action) => {
+          state.status = "success"
+          state.isEmailConfirmed = true
+          state.user = action.payload.user || state.user
+          state.registerError = undefined
+          state.successMessage = "Email successfully confirmed! Please log in."
+        },
+
+        rejected: (state, action) => {
+          state.status = "error"
+          state.successMessage = undefined
+          state.registerMessage = undefined
+          state.registerError =
+            typeof action.payload === "string"
+              ? action.payload
+              : "Something went wrong"
+        },
+      },
+    ),
+    clearRegisterStatus: create.reducer((state: AuthSliceState) => {
+      state.registerError = undefined
+      state.registerMessage = undefined
+    }),
+
   }),
   selectors: {
     userData: (state: AuthSliceState) => state.user,
@@ -170,6 +238,7 @@ export const authSlice = createAppSlice({
     accessToken: (state: AuthSliceState) => state.accessToken,
     refreshToken: (state: AuthSliceState) => state.refreshToken,
     isLoggedIn: (state: AuthSliceState) => state.isLoggedIn,
+    isEmailConfirmed: (state: AuthSliceState) => state.isEmailConfirmed,
   },
 })
 

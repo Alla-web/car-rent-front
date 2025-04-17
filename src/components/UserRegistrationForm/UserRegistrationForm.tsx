@@ -7,30 +7,48 @@ import { useFormik } from "formik"
 import { RegisrtationFormValues } from "./types"
 import { useAppDispatch, useAppSelector } from "store/hooks"
 import { authActions, authSelectors } from "store/redux/AuthSlice/authSlice"
-//import NotificationMessage from "components/Notification/Notification"
 import Notification from "components/Notification/Notification1"
 import Loader from "components/Loader/Loader"
 import { FaEye, FaEyeSlash } from "react-icons/fa"
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom"
 
 type UserRegistrationFormProps = {
   img?: boolean
 }
 
 function UserRegistrationForm({ img = true }: UserRegistrationFormProps) {
-  useEffect(() => {
-    // Прокрутка страницы вверх
-    window.scrollTo(0, 0)
-  }, [])
 
   const dispatch = useAppDispatch()
-  const navigate = useNavigate();
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    dispatch(authActions.clearRegisterStatus())
+    // Прокрутка страницы вверх
+    window.scrollTo(0, 0)
+  }, [dispatch])
+
+ 
   const status = useAppSelector(authSelectors.authStatus)
   const registerError = useAppSelector(authSelectors.registerError)
   const registerMessage = useAppSelector(authSelectors.registerMessage)
 
+
   const [showPassword, setShowPassword] = useState(false)
   const [isNotificationVisible, setIsNotificationVisible] = useState(false)
+
+  const onHandleCloseNotification = () => {
+    setIsNotificationVisible(false)
+    /* if (isEmailConfirmed) {
+      navigate("/login")
+    } */
+  }
+
+  useEffect(() => {
+    if (registerError || registerMessage /* || isEmailConfirmed */) {
+      setIsNotificationVisible(true)
+    }
+  }, [registerError, registerMessage/* , isEmailConfirmed */])
+
 
   const passwordRegex =
     /^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$ %^&*-]).{8,}$/
@@ -66,26 +84,18 @@ function UserRegistrationForm({ img = true }: UserRegistrationFormProps) {
     validationSchema,
     validateOnChange: false,
 
-    onSubmit: (values: RegisrtationFormValues) => {
-      console.table(values) // временно
-      dispatch(authActions.registerNewCustomer(values))
+    onSubmit: async (values: RegisrtationFormValues) => {
+     
+     const result = await dispatch(authActions.registerNewCustomer(values))
+     
+     if(authActions.registerNewCustomer.fulfilled.match(result)){
       formik.resetForm()
       setIsNotificationVisible(true)
+      navigate(`/confirm-email/${values.email}`)
+     }
+     
     },
   })
-
-  const onHandleCloseNotification = () => {
-    setIsNotificationVisible(false) 
-    if (registerMessage) {
-      navigate("/login"); // на страницу логина
-    }
-  }
-
-  useEffect(() => {
-    if (registerError || registerMessage) {
-      setIsNotificationVisible(true)
-    }
-  }, [registerError, registerMessage])
 
   return (
     <div className="flex justify-center items-center -mt-4 px-4 sm:px-6 lg:px-8">
@@ -100,13 +110,6 @@ function UserRegistrationForm({ img = true }: UserRegistrationFormProps) {
                 <Notification
                   topic="Error"
                   message={registerError}
-                  onClose={onHandleCloseNotification}
-                />
-              )}
-              {registerMessage && (
-                <Notification
-                  topic="Success"
-                  message={registerMessage}
                   onClose={onHandleCloseNotification}
                 />
               )}
@@ -216,25 +219,27 @@ function UserRegistrationForm({ img = true }: UserRegistrationFormProps) {
               </a>
             </span>
           </label>
-
+          {status === "loading" && (
+        <div className="flex justify-center items-center mt-4">
+          <Loader />
+        </div>
+      )}
           <Button
-            name="Create"
+            name={status === "loading" ? "Creating..." : "Create"}
             type="submit"
             disabled={
               !formik.values.isChecked ||
               !formik.values.firstName ||
               !formik.values.lastName ||
               !formik.values.email ||
-              !formik.values.password
+              !formik.values.password ||
+              status === "loading"
+
             }
           />
         </form>
       </div>
-      {status === "loading" && (
-        <div className="flex justify-center items-center mt-4">
-          <Loader />
-        </div>
-      )}
+  
       {img && (
         <div className="hidden lg:block w-[350px] h-[450px] relative ml-6">
           <img
